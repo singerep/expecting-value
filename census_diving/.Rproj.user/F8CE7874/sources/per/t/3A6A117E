@@ -1,0 +1,26 @@
+{
+    "id": "3A6A117E",
+    "path": "~/ev/census_diving/B25093_016/explore.R",
+    "project_path": "B25093_016/explore.R",
+    "type": "r_source",
+    "hash": "1326738624",
+    "contents": "",
+    "dirty": false,
+    "created": 1687494108009.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "18,14",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1687495923,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1687495923580,
+    "read_only": false,
+    "read_only_alternatives": []
+}

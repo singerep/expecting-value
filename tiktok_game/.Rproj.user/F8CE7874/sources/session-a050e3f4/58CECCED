@@ -1,0 +1,26 @@
+{
+    "id": "58CECCED",
+    "path": "~/ev/tiktok_game/analyze.R",
+    "project_path": "analyze.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": true,
+    "created": 1688391215156.0,
+    "source_on_save": false,
+    "relative_order": 2,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "37,0",
+        "scrollLine": "20"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1688567730,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1688615617351,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,25 @@
+{
+    "id": "564CE3E8",
+    "path": null,
+    "project_path": null,
+    "type": "r_code_browser",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1687376281051.0,
+    "source_on_save": false,
+    "relative_order": 2,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "context": "package:ggplot2:::scale_fill_gradient"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 0,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1687376281051,
+    "read_only": false,
+    "read_only_alternatives": []
+}

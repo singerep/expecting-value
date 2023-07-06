@@ -1,0 +1,26 @@
+{
+    "id": "96AE325F",
+    "path": "~/ev/american_center/find_center.R",
+    "project_path": "find_center.R",
+    "type": "r_source",
+    "hash": "3494507738",
+    "contents": "",
+    "dirty": false,
+    "created": 1687034925459.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "245,0",
+        "scrollLine": "238"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1687215434,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1687215434397,
+    "read_only": false,
+    "read_only_alternatives": []
+}

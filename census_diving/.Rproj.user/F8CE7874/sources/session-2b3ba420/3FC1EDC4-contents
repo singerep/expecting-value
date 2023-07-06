@@ -1,0 +1,118 @@
+library(tidyverse)
+library(tidycensus)
+library(tigris)
+library(sf)
+library(ggplot2)
+library(scales)
+library(ineq)
+
+census_api_key("11d46bc70e375d39b67b4b4919a0099934aecbc7")
+
+tracts <- list()
+for (state_code in unique(fips_codes$state_code)[1:51]) {
+  print(state_code)
+  state_tracts <- get_acs(
+    geography = "tract",
+    state = state_code,
+    year = 2021, 
+    survey = "acs5", 
+    table = c("B25040"),
+    geometry = TRUE, 
+    output = "wide"
+  )
+  tracts <- bind_rows(tracts, state_tracts)
+}
+
+tracts <- tracts %>%
+  shift_geometry() %>%
+  rename("Total" = B25040_001E, "Gas" = B25040_002E, "Tank" = B25040_003E, "Electric" = B25040_004E, "Oil" = B25040_005E, "Coal" = B25040_006E, "Wood" = B25040_007E, "Solar" = B25040_008E)
+
+counties <- list()
+for (year in c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2021)) {
+  year_counties <- get_acs(
+    geography = "county",
+    year = year, 
+    survey = "acs5", 
+    table = c("B25040"),
+    geometry = TRUE,
+    output = "wide"
+  ) %>%
+    shift_geometry()
+  year_counties["year"] <- year
+  counties <- bind_rows(counties, year_counties)
+}
+
+counties <- counties %>%
+  rename("Total" = B25040_001E, "Gas" = B25040_002E, "Tank" = B25040_003E, "Electric" = B25040_004E, "Oil" = B25040_005E, "Coal" = B25040_006E, "Wood" = B25040_007E, "Solar" = B25040_008E)
+
+states <- list()
+for (year in c(2011, 2012, 2014, 2015, 2016, 2017, 2018, 2019, 2021)) {
+  year_states <- get_acs(
+    geography = "state",
+    year = year, 
+    survey = "acs1", 
+    variables = c("B01001_001", "B25040_008", "B07013_002", "B25040_001"), 
+    geometry = TRUE, 
+    output = "wide"
+  ) %>%
+    shift_geometry()
+  year_states["year"] <- year
+  states <- bind_rows(states, year_states)
+}
+
+states <- states %>%
+  mutate(proportion_solar = B25040_008E/B25040_001E)
+
+states %>%
+  filter(GEOID != "72") %>%
+  filter(year == 2021) %>%
+  st_simplify(dTolerance = 5000) %>%
+  ggplot() +
+    geom_sf(aes(fill=proportion_solar), color="white") +
+    scale_fill_gradient(low = "#403c32", high = "#FDB813", name = "", labels=scales::percent) +
+    labs(title = "Proportion of houses using solar energy for heat") +
+    theme(panel.grid.major = element_blank(), axis.text=element_blank(), axis.ticks=element_blank(), legend.position = c(0.08, 0.7), legend.background = element_blank(), legend.key.height = unit(1, 'cm'))
+
+counties %>%
+  filter(!startsWith(GEOID, "72")) %>%
+  group_by(GEOID) %>%
+  mutate(delta = (B25040_008E - first(B25040_008E))) %>%
+  mutate(delta = ifelse(is.na(delta) | is.infinite(delta), 0, delta)) %>%
+  filter(B25040_001E > 100000) %>%
+  ggplot() +
+    geom_line(aes(x=year, y=delta, group=GEOID), alpha=0.2) +
+    theme(legend.position = "none")
+
+counties %>%
+  filter(!startsWith(GEOID, "72") & year == "2021") %>%
+  # st_simplify(dTolerance = 5000) %>%
+  ggplot() +
+    geom_sf(aes(fill=proportion_solar), color=NA) +
+    scale_fill_gradient(low = "#403c32", high = "#FDB813", name = "", labels=scales::percent) +
+    labs(title = "Proportion of houses using solar energy for heat") +
+    theme(panel.grid.major = element_blank(), axis.text=element_blank(), axis.ticks=element_blank(), legend.position = c(0.08, 0.7), legend.background = element_blank(), legend.key.height = unit(1, 'cm'))
+
+tracts %>%
+  filter(!startsWith(GEOID, "72") & year == "2021") %>%
+  as_tibble() %>%
+  select("NAME", "Gas", "Tank", "Electric", "Oil", "Coal", "Wood", "Solar") %>%
+  pivot_longer(cols = c("Gas", "Tank", "Electric", "Oil", "Coal", "Wood", "Solar"), names_to = "energy") %>%
+  mutate(energy = fct_relevel(energy, c("Gas", "Electric", "Tank", "Wood", "Oil", "Solar", "Coal"))) %>%
+  group_by(energy) %>%
+  arrange(value) %>%
+  mutate(cum_tract_prop = 100*row_number()/n(), cum_house_prop = 100*cumsum(value)/sum(value)) %>%
+  ggplot() +
+    annotate("segment", x = 0, y = 0, xend = 100, yend = 100, lty="dashed") +
+    geom_line(aes(x=cum_tract_prop, y=cum_house_prop, color=energy)) +
+    xlab("Cumulative % of Census Tracts (ordered)") +
+    ylab("Cumulative % of Housing Units\nUsing Energy Source") +
+    labs(title = 'Energy Source Usage Lorenz Curves', color="Energy Source")
+
+counties %>%
+  filter(!startsWith(GEOID, "72") & year == "2021") %>%
+  as_tibble() %>%
+  select("NAME", "Gas", "Tank", "Electric", "Oil", "Coal", "Wood", "Solar") %>%
+  pivot_longer(cols = c("Gas", "Tank", "Electric", "Oil", "Coal", "Wood", "Solar"), names_to = "energy") %>%
+  group_by(energy) %>%
+  summarise(gini = ineq(value, type="Gini"), total = sum(value)) %>%
+  arrange(gini)

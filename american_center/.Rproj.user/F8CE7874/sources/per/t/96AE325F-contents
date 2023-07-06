@@ -1,0 +1,258 @@
+library(tidyverse)
+library(hash)
+library(emIRT)
+library(corpcor)
+
+nscape <- read_csv("/Users/ethansinger/data/nationscape.csv")
+nscape <- nscape %>% 
+  mutate(
+    fc_trad_val = factor(recode(fc_trad_val, "The government should promote traditional family values in our society" = "Social Conservative", "The government should not promote traditional family values in our society" = "Social Liberal"), levels = c("Social Liberal", "Social Conservative")),
+    fc_smallgov = factor(recode(fc_smallgov, "I favor a larger government with more services" = "Economic Liberal", "I favor a smaller government with fewer services" = "Economic Conservative"), levels = c("Economic Liberal", "Economic Conservative")),
+    race = recode(
+      race_ethnicity,
+      "White" = "White",
+      "Black, or African American" = "Black",
+      "Asian (Asian Indian)" = "Asian",
+      "Asian (Korean)" = "Asian",
+      "Asian (Vietnamese)" = "Asian",
+      "Asian (Other)" = "Asian",
+      "Asian (Japanese)" = "Asian",
+      "Asian (Chinese)" = "Asian",
+      .default = "Other"
+    )
+  )
+
+nscape %>% 
+  group_by(fc_smallgov, fc_trad_val) %>%
+  summarise(weighted_sum = sum(weight)) %>%
+  drop_na() %>%
+  ungroup() %>%
+  mutate(proportion = weighted_sum/sum(weighted_sum)) %>%
+  ggplot(aes(x=fc_smallgov, y=fc_trad_val, fill=proportion)) +
+    geom_tile() +
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white") +
+    geom_text(aes(x=fc_smallgov, y=fc_trad_val, label=paste(round(100*proportion, 2), "%", sep='')), color = "white", size = 4)
+
+e_questions <- c(
+  "mctaxes", 
+  "estate_tax", 
+  "raise_upper_tax", 
+  "college", 
+  "china_tariffs", 
+  "guaranteed_jobs",
+  "abolish_priv_insurance",
+  "medicare_for_all",
+  "minwage",
+  "oil_and_gas",
+  "right_to_work",
+  "trade",
+  "uctaxes2",
+  "gov_insurance",
+  "public_option",
+  "health_subsidies",
+  "statements_confront_china"
+)
+s_questions <- c(
+  "abortion_any_time", 
+  "abortion_never", 
+  "abortion_conditions", 
+  "late_term_abortion",
+  "abortion_insurance",
+  "abortion_waiting",
+  "criminal_immigration",
+  "immigration_insurance",
+  "immigration_separation",
+  "immigration_system",
+  "immigration_wire",
+  "marijuana",
+  "maternityleave",
+  "muslimban",
+  "reparations",
+  "ten_commandments",
+  "trans_military",
+  "path_to_citizenship",
+  "dreamers",
+  "deportation",
+  "racial_attitudes_tryhard",
+  "racial_attitudes_generations",
+  "racial_attitudes_marry",
+  "racial_attitudes_date",
+  "gender_attitudes_maleboss",
+  "gender_attitudes_logical",
+  "gender_attitudes_opportunity",
+  "gender_attitudes_complain",
+  "statements_protect_traditions",
+  "statements_christianity_assault",
+  "statements_gender_identity",
+  "statements_american_loss",
+  "statements_imm_assimilate"
+)
+
+n <- nrow(nscape)
+
+d_total_weight <- sum(nscape[nscape["pid3"] == 'Democrat',]["weight"], na.rm=TRUE)
+r_total_weight <- sum(nscape[nscape["pid3"] == 'Republican',]["weight"], na.rm=TRUE)
+for (q in c(s_questions, e_questions)) {
+  d_proportion <- sum(nscape[(nscape[q] == "Agree" | nscape[q] == "Strongly agree") & (nscape["pid3"] == "Democrat"),]["weight"], na.rm=TRUE)/d_total_weight
+  r_proportion <- sum(nscape[(nscape[q] == "Agree" | nscape[q] == "Strongly agree") & (nscape["pid3"] == "Republican"),]["weight"], na.rm=TRUE)/r_total_weight
+  if (d_proportion > r_proportion) {
+    strong_agree_rows <- nscape[q] == "Strongly agree"
+    somewhat_agree_rows <- nscape[q] == "Somewhat agree"
+    agree_rows <- nscape[q] == "Agree"
+    strong_disagree_rows <- nscape[q] == "Strongly disagree"
+    somewhat_disagree_rows <- nscape[q] == "Somewhat disagree"
+    disagree_rows <- nscape[q] == "Disagree"
+    
+    nscape[q][strong_agree_rows] <- "Strongly disagree"
+    nscape[q][somewhat_agree_rows] <- "Somewhat disagree"
+    nscape[q][agree_rows] <- "Disagree"
+    nscape[q][strong_disagree_rows] <- "Strongly agree"
+    nscape[q][somewhat_disagree_rows] <- "Somewhat agree"
+    nscape[q][disagree_rows] <- "Agree"
+  }
+}
+
+e_bin_votes <- nscape[, e_questions] %>%
+  mutate_all(recode, "Strongly agree" = 1, "Somewhat agree" = 1, "Agree" = 1, "Strongly disagree" = -1, "Somewhat disagree" = -1, "Disagree" = -1, "Not Sure" = 0, "Neither agree nor disagree" = 0, .default = 9)
+e_rc <- list()
+e_rc$votes <- as.matrix(e_bin_votes)
+e_m <- ncol(e_bin_votes)
+
+e_starts <- getStarts(n, e_m, 1)
+e_priors <- makePriors(n, e_m, 1)
+
+e_out <- binIRT(.rc = e_rc,
+               .starts = e_starts,
+               .priors = e_priors,
+               .control = {
+                 list(threads = 1,
+                      verbose = FALSE,
+                      thresh = 1e-6
+                 )
+               }
+)
+s_bin_votes <- nscape[, s_questions] %>%
+  mutate_all(recode, "Strongly agree" = 1, "Somewhat agree" = 1, "Agree" = 1, "Strongly disagree" = -1, "Somewhat disagree" = -1, "Disagree" = -1, "Not Sure" = 0, "Neither agree nor disagree" = 0, .default = 9)
+s_rc <- list()
+s_rc$votes <- as.matrix(s_bin_votes)
+s_m <- ncol(s_bin_votes)
+
+s_starts <- getStarts(n, s_m, 1)
+s_priors <- makePriors(n, s_m, 1)
+
+s_out <- binIRT(.rc = s_rc,
+                .starts = s_starts,
+                .priors = s_priors,
+                .control = {
+                  list(threads = 1,
+                       verbose = FALSE,
+                       thresh = 1e-6
+                  )
+                }
+)
+
+nscape["e_ideal"] <- -wt.scale(e_out$means$x, nscape$weight)
+nscape["s_ideal"] <- -wt.scale(s_out$means$x, nscape$weight)
+
+ggplot(sample_n(nscape, 5000)) +
+  geom_point(aes(x=e_ideal, y=s_ideal, color=fc_smallgov), size=1) +
+  theme(legend.position = "top")
+
+ggplot(sample_n(nscape, 5000)) +
+  geom_point(aes(x=e_ideal, y=s_ideal, color=fc_trad_val), size=1) +
+  theme(legend.position = "top")
+
+nscape <- nscape %>%
+  mutate(e_ideal_label = factor(ifelse(e_ideal < 0, "Economic Liberal", "Economic Conservative"), levels = c("Economic Liberal", "Economic Conservative")), s_ideal_label = factor(ifelse(s_ideal < 0, "Social Liberal", "Social Conservative"), levels = c("Social Liberal", "Social Conservative")))
+
+nscape['ideal_group'] <- case_when(
+  nscape['e_ideal_label'] == 'Economic Liberal' & nscape['s_ideal_label'] == 'Social Liberal' ~ 'EL, SL',
+  nscape['e_ideal_label'] == 'Economic Liberal' & nscape['s_ideal_label'] == 'Social Conservative' ~ 'EL, SC',
+  nscape['e_ideal_label'] == 'Economic Conservative' & nscape['s_ideal_label'] == 'Social Liberal' ~ 'EC, SL',
+  nscape['e_ideal_label'] == 'Economic Conservative' & nscape['s_ideal_label'] == 'Social Conservative' ~ 'EC, SC',
+)
+
+nscape %>% 
+  group_by(e_ideal_label, s_ideal_label) %>%
+  summarise(weighted_sum = sum(weight)) %>%
+  drop_na() %>%
+  ungroup() %>%
+  mutate(proportion = weighted_sum/sum(weighted_sum)) %>%
+  ggplot(aes(x=e_ideal_label, y=s_ideal_label, fill=proportion)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white") +
+  geom_text(aes(x=e_ideal_label, y=s_ideal_label, label=paste(round(100*proportion, 2), "%", sep='')), color = "white", size = 4)
+
+ggplot() +
+  geom_point(aes(x=s_questions, y=(s_out$means$beta[,2]))) +
+  theme(axis.text.x = element_text(angle = 45, hjust=1))
+
+e_ord_votes <- nscape[, e_questions] %>%
+  mutate_all(recode, "Strongly agree" = 1, "Somewhat agree" = 0.5, "Agree" = 1, "Strongly disagree" = -1, "Somewhat disagree" = -0.5, "Disagree" = -1, "Not Sure" = 0, "Neither agree nor disagree" = 0, .default = 9)
+
+s_ord_votes <- nscape[, s_questions] %>%
+  mutate_all(recode, "Strongly agree" = 1, "Somewhat agree" = 0.5, "Agree" = 1, "Strongly disagree" = -1, "Somewhat disagree" = -0.5, "Disagree" = -1, "Not Sure" = 0, "Neither agree nor disagree" = 0, .default = 9)
+
+nscape["e_simple_avg"] <- e_ord_votes %>%
+  mutate(across(everything(), ~ ifelse(. %in% c(1, 0.5, 0, -0.5, -1), ., NA))) %>%
+  rowwise() %>%
+  mutate(avg = mean(c_across(everything()), na.rm = TRUE)) %>%
+  ungroup() %>%
+  select(avg)
+
+nscape["s_simple_avg"] <- s_ord_votes %>%
+  mutate(across(everything(), ~ ifelse(. %in% c(1, 0.5, 0, -0.5, -1), ., NA))) %>%
+  rowwise() %>%
+  mutate(avg = mean(c_across(everything()), na.rm = TRUE)) %>%
+  ungroup() %>%
+  select(avg)
+
+nscape <- nscape %>%
+  mutate(e_simple_avg_label = factor(ifelse(e_simple_avg < 0, "Economic Liberal", "Economic Conservative"), levels = c("Economic Liberal", "Economic Conservative")), s_simple_avg_label = factor(ifelse(s_simple_avg < 0, "Social Liberal", "Social Conservative"), levels = c("Social Liberal", "Social Conservative")))
+
+ggplot(sample_n(nscape, 10000)) +
+  geom_point(aes(x=e_simple_avg, y=s_simple_avg, color=trump_biden)) +
+  theme(legend.position = "top")
+
+ggplot(sample_n(nscape, 10000)) +
+  geom_point(aes(x=e_ideal, y=s_ideal, color=trump_biden), size=0.05) +
+  theme(legend.position = "top")
+
+nscape %>% 
+  group_by(e_simple_avg_label, s_simple_avg_label) %>%
+  summarise(weighted_sum = sum(weight)) %>%
+  drop_na() %>%
+  ungroup() %>%
+  mutate(proportion = weighted_sum/sum(weighted_sum)) %>%
+  ggplot(aes(x=e_simple_avg_label, y=s_simple_avg_label, fill=proportion)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white") +
+  geom_text(aes(x=e_simple_avg_label, y=s_simple_avg_label, label=paste(round(100*proportion, 2), "%", sep='')), color = "white", size = 4)
+
+nscape %>% 
+  group_by(e_simple_avg_label, s_simple_avg_label) %>%
+  summarise(weighted_sum = sum(weight)) %>%
+  drop_na() %>%
+  ungroup() %>%
+  mutate(proportion = weighted_sum/sum(weighted_sum)) %>%
+  ggplot(aes(x=e_simple_avg_label, y=s_simple_avg_label, fill=proportion)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white") +
+  geom_text(aes(x=e_simple_avg_label, y=s_simple_avg_label, label=paste(round(100*proportion, 2), "%", sep='')), color = "white", size = 4)
+
+ggplot(nscape) +
+  geom_density(aes(x=age, group=ideal_group, color=ideal_group, fill=ideal_group), alpha=0.3)
+
+ggplot(nscape) +
+  geom_bar(aes(fill=race_ethnicity))
+
+nscape %>%
+  group_by(ideal_group, race) %>%
+  count() %>%
+  ggplot() +
+    geom_bar(aes(fill=race, x=ideal_group, y=n), position="fill", stat="identity")
+
+
+unique(nscape$race_ethnicity)
+
+

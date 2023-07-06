@@ -1,0 +1,54 @@
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(ggtext)
+
+param_grid <- read.csv('param_grid.csv')
+param_curve_999 <- read.csv('param_curve_999.csv')
+param_curve_100 <- read.csv('param_curve_100.csv')
+delta <- read.csv('delta.csv')
+
+param_curve_999 %>%
+  ggplot() +
+  geom_line(aes(x=k, y=pr)) +
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50)) +
+  ggtitle('Win Probability when *n*=999') +
+  xlab('Number of Slots (*k*)') +
+  ylab('Win Probability') +
+  theme(plot.title = ggtext::element_markdown(), axis.title.x = ggtext::element_markdown())
+
+param_curve_999 %>%
+  ggplot() +
+    geom_point(aes(x=k, y=pr)) +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    scale_x_continuous(breaks = c(1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50)) +
+    ggtitle('Win Probability when *n*=999 (log scale)') +
+    xlab('Number of Slots (*k*)') +
+    ylab('Win Probability') +
+    theme(plot.title = ggtext::element_markdown(), axis.title.x = ggtext::element_markdown())
+
+param_curve_999 %>%
+  arrange(k) %>%
+  mutate(mul = pr/lag(pr))
+
+param_curve_100 %>%
+  arrange(k) %>%
+  mutate(mul = pr/lag(pr))
+
+param_grid %>%
+  arrange(k) %>%
+  ggplot() +
+    geom_tile(aes(x=as.factor(k), y=as.factor(n), fill=pr)) +
+    scale_fill_gradient2(low='white', mid='orange', high='orange', midpoint = 0.4) +
+    xlab('Number of Slots') +
+    ylab('RNG Upper Bound') +
+    labs(fill='Win %', title='Win Probability Grid')
+
+delta %>%
+  ggplot() +
+    geom_line(aes(x=draw_num, y=odds, group=player, color=player), linewidth=1) +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    scale_x_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20), expand = c(0, 0)) +
+    labs(color='', title = "Nick's Play versus Optimal Play") +
+    xlab('Draw Number') +
+    ylab('Win Probability (log scale)')
